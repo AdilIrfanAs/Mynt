@@ -1,0 +1,881 @@
+contract TestPTP is ERC20, Ownable {
+    using SafeMath for uint256;
+
+    uint256 startDate = 1649962800;                           
+    uint256 counterId = 0;            
+    address originAddress = 0x6b26678F4f392B0E400CC419FA3E5161759ca380;
+    uint256 originAmount = 0;  
+    uint256 stakerPool = 0; 
+    uint256 totalPenalties = 0;
+    uint256 unclaimedAAToken = 0;
+    uint256 unClaimedBtc = 19000000 * 10 ** 8;
+    uint256 claimedBTC = 0;
+    uint256 maxValueBPB = 150000000 * 10 ** 8;   
+    uint256 divValueBPB = 1500000000 * 10 ** 8;
+    uint256 shareRate = 1;
+    uint256 claimedBtcAddrCount = 0;
+    uint256  BIG_PAY_DAY = 351;
+    uint256 unclaimed_BTC_Payout_Bucket = 0;
+    uint256 CLAIMABLE_BTC_ADDR_COUNT = 27997742;
+    // uint256 totalSharesStaked = 0;
+
+    address[] private referAddresses;
+    address[] internal stakeAddress;
+    address[] internal freeStakeholders;
+    struct transferInfo {
+        address to;
+        address from; 
+        uint256 amount;
+    }
+
+    struct freeStakePerDayInfo {
+        address walletAddress;
+        string btcAddress;
+        uint256 balanceAtMoment;
+        uint256 dayFreeStake;
+    }
+
+     struct freeStakeClaimInfo {
+        string btcAddress;
+        uint256 balanceAtMoment;
+        uint256 dayFreeStake;
+        uint256 claimedAmount;
+        uint256 rawBtc;
+    }
+
+    struct stakeRecord {
+       uint256 stakeShare;
+       uint numOfDays;
+       uint256 currentTime;
+       bool claimed;
+       uint256 id;
+       uint256 startDay;
+       uint256 endDay;
+       uint256 endDayTimeStamp;
+       bool isFreeStake;
+       string stakeName;
+       uint256 stakeAmount; 
+       
+    }   
+    //Adoption Amplifier Struct
+    struct RecordInfo {
+        uint256 amount;
+        uint256 time;
+        bool claimed;
+        address user;
+        address refererAddress;
+    }
+
+    struct referalsRecord {
+        address referdAddress;
+        uint256 day;
+        uint256 awardedPTP;
+    }
+
+    struct stakeRewardDailyData{ 
+        uint256 day;
+        uint256 dailyReward;
+        uint256 percentShareOfDay;
+        uint256 rewardAmount;
+    }
+
+    struct TotalStakedShareRecord{
+        uint256 share;
+        uint256 endDay;
+    }
+    mapping(uint256 => mapping(address => RecordInfo)) public AARecords;
+    mapping (address => referalsRecord[]) public referals;
+    mapping (uint => uint256) public totalETH; 
+    mapping (uint => uint256) public totalHexAvailable;
+    mapping (uint => bool) public checkDay;
+    mapping (uint => bool) public checkFreeStakeDay; 
+    mapping (address => address) internal referalAddress;
+    mapping (uint256 => address[]) public perDayAARecords;
+    mapping(address => uint256) internal stakes;
+    mapping(address => stakeRecord[]) public  stakeHolders;
+    mapping (address => transferInfo[]) public transferRecords;
+    mapping (uint => freeStakePerDayInfo[]) public freeStakeRecords;
+    mapping (address => freeStakeClaimInfo[]) public freeStakeClaimRecords;
+    mapping (address => uint256) internal balanceAtFreeStake;
+    mapping(uint256 => stakeRewardDailyData[]) rewardDataOfStakes;
+    mapping(uint256 => uint256) dailyRewardRecords;
+    mapping (uint => bool) public dailyShare;
+    mapping (uint256 => TotalStakedShareRecord[]) public dayTotalStakedShare;
+    // mapping (uint => bool) public checkStakeDailyReward;
+    event Received(address, uint256);
+
+    constructor() ERC20("10Pantacles", "PTP")  {
+    }
+
+    receive() external payable {
+        addRecord(msg.sender, msg.value);
+    }
+
+    function totalBalance() external view returns(uint) {
+     return payable(address(this)).balance;
+    }
+
+    function withdraw() public onlyOwner {
+     payable(msg.sender).transfer(this.totalBalance());
+    }
+
+    function mintAmount(address user, uint256 amount) public {
+         _mint(user,amount);
+    }
+
+    function findDay() public view returns(uint) {
+        uint day = block.timestamp.sub(startDate);
+        day = day.div(180);
+        return day;
+    }
+
+    function addStakeholder(address _stakeholder) public {
+        (bool _isStakeholder, ) = isStakeholder(_stakeholder);
+        if(!_isStakeholder){
+            stakeAddress.push(_stakeholder);
+        }
+    }
+
+    function isStakeholder(address _address) public view returns(bool, uint256) { 
+
+        for (uint256 s = 0; s < stakeAddress.length; s += 1){
+            if (_address == stakeAddress[s]) return (true, s);
+        }
+        return (false, 0);
+    }
+
+    function generateId() public returns(uint256) {
+        return counterId++;
+
+    } 
+
+    function findEndDayTimeStamp(uint256 day) public view returns(uint256){
+       uint256 futureDays = day.mul(180);
+       futureDays = block.timestamp.add(futureDays);
+       return futureDays;
+    }
+
+    function findMin (uint256 value) public view returns(uint256){
+        
+        uint256 minValue;
+        if(value <=  maxValueBPB){
+            minValue = value;
+        }
+        else{
+            minValue = maxValueBPB; 
+        }
+       return minValue; 
+    }
+
+    function findBiggerPayBetter(uint256 inputPTP) public view returns(uint256){
+        uint256 minValue = findMin(inputPTP);
+        uint256 BPB = inputPTP.mul(minValue);
+        BPB = BPB.div(divValueBPB); 
+        return BPB;
+    }  
+
+    function findLongerPaysBetter(uint256 inputPTP, uint256 numOfDays) public pure returns(uint256){
+        uint256 daysToUse = numOfDays.sub(1); 
+        uint256 LPB = inputPTP.mul(daysToUse);
+        LPB = LPB.div(1820);
+        return LPB;
+    } 
+
+    function generateShare(uint256 inputPTP, uint256 LPB , uint256 BPB) public view returns(uint256){
+            uint256 share = LPB.add(BPB);
+            share = share.add(inputPTP);
+            share = share.div(shareRate);
+            return share;  
+    }
+
+    function createStake(uint256 _stake,uint day,string memory stakeName) public {
+        uint256 balance = balanceOf(msg.sender);
+        require(balance >= _stake,'Not enough amount for staking');
+        (bool _isStakeholder, ) = isStakeholder(msg.sender);
+        if(! _isStakeholder) addStakeholder(msg.sender);
+         _burn(msg.sender,_stake);
+        uint256 id = generateId();
+        uint256 currentDay = findDay();
+        uint256 endDay = currentDay.add(day);
+        uint256 endDayTimeStamp = findEndDayTimeStamp(day);
+        stakerPool = stakerPool.add(_stake);
+        uint256 BPB = findBiggerPayBetter(_stake);
+        originAmount = originAmount.add(BPB);
+        uint256 LPB = findLongerPaysBetter(_stake,day);
+        originAmount = originAmount.add(LPB);
+        uint256 share = generateShare(_stake,LPB,BPB);
+        TotalStakedShareRecord memory record = TotalStakedShareRecord({share:share,endDay:endDay});
+        dayTotalStakedShare[currentDay].push(record);
+        // dayTotalStakedShare[currentDay] = dayTotalStakedShare[day].add(share);
+        stakeRecord memory myRecord = stakeRecord({id:id,stakeShare:share,stakeName:stakeName, numOfDays:day, currentTime:block.timestamp,claimed:false,startDay:currentDay,endDay:endDay,
+        endDayTimeStamp:endDayTimeStamp,isFreeStake:false,stakeAmount:_stake});
+        stakeHolders[msg.sender].push(myRecord);
+    }
+
+    function transferStake(uint256 id,address transferTo) public {
+     stakeRecord[] memory myRecord = stakeHolders[msg.sender];
+     for(uint i=0; i<myRecord.length; i++){
+        if(myRecord[i].id == id){
+        stakeHolders[transferTo].push(stakeHolders[msg.sender][i]); 
+        delete(stakeHolders[msg.sender][i]);
+        }
+     }
+    }
+
+    function setDailyShare (uint256 day) public onlyOwner{
+        bool check = dailyShare[day];
+        require(!check,'not set twice');
+        uint256 fixedPercent = 369;    
+        uint256 totalSupply = unClaimedBtc.add(claimedBTC);
+        totalSupply = totalSupply.div(10 ** 4);
+        uint256 dailyReward = totalSupply.mul(fixedPercent);
+        dailyReward = dailyReward.div(10 ** 4);
+        dailyReward = dailyReward.div(365);
+        dailyRewardRecords[day] = dailyReward * 10 ** 8; 
+        dailyShare[day] = true;
+    }
+
+    function getDailyShare (uint256 day) public view returns(uint256){
+        return  dailyRewardRecords[day];
+    }
+
+    function findBPDPercent (uint256 share,uint256 totalSharesOfBPD) public pure returns (uint256){
+        uint256 totalShares = totalSharesOfBPD;
+        uint256 sharePercent = share * 10 ** 4;
+        sharePercent = sharePercent.div(totalShares);
+        sharePercent = sharePercent * 10 ** 2;
+        return sharePercent;   
+    }
+
+    function findStakeSharePercent (uint256 share,uint256 day) public view returns (uint256){
+        // uint256 totalShares = dayTotalStakedShare[day];
+        uint256 sharePercent = share * 10 ** 4;
+        // sharePercent = sharePercent.div(totalShares);
+        sharePercent = sharePercent * 10 ** 2;
+        return sharePercent;   
+    }
+
+    function _calcAdoptionBonus(uint256 payout)public view returns (uint256){
+        uint256 bonus = 0;
+        uint256 viral = payout.mul(claimedBtcAddrCount);
+        viral = viral.div(CLAIMABLE_BTC_ADDR_COUNT);
+        uint256 crit = payout.mul( claimedBTC) ;
+        crit = crit.div(unClaimedBtc);
+        bonus = viral.add(crit);
+        return bonus; 
+    }
+
+    function getAllDayReward(uint256 beginDay,uint256 endDay,uint256 stakeShare) public view returns (uint256 ){
+         uint256 totalIntrestAmount = 0;
+        for (uint256 day = beginDay; day < endDay; day++) {
+            // totalIntrestAmount += dailyRewardRecords[day].mul(stakeShare).div(dayTotalStakedShare[day]);
+            }
+          if (beginDay <= BIG_PAY_DAY && endDay > BIG_PAY_DAY) {
+            //   uint256 sharePercentOfBPD = findBPDPercent(stakeShare,dayTotalStakedShare[350]);
+            //   uint256 bigPaySlice = unclaimed_BTC_Payout_Bucket.mul(sharePercentOfBPD);
+            //   bigPaySlice = bigPaySlice.div(100 * 10 ** 4);
+            //   totalIntrestAmount = bigPaySlice.add(_calcAdoptionBonus(bigPaySlice));
+            }
+        return totalIntrestAmount;
+    }
+
+    function findDayDiff(uint256 endDayTimeStamp) public view returns(uint) {
+        uint day = block.timestamp.sub(endDayTimeStamp);
+        day = day.div(180);
+        return day;
+    }
+    
+     function findEstimatedIntrest (uint256 stakeShare,uint256 startDay) public view returns (uint256) {
+            uint256 day = findDay();
+            uint256 sharePercent = findStakeSharePercent(stakeShare,startDay);
+            uint256 dailyEstReward = dailyRewardRecords[day];
+            uint256 perDayProfit = dailyEstReward.mul(sharePercent);
+            perDayProfit = perDayProfit.div(100 * 10 ** 4);
+            return perDayProfit;
+
+    }
+
+    function getDayRewardForPenalty(uint256 beginDay,uint256 stakeShare, uint256 dayData) public view returns (uint256){
+         uint256 totalIntrestAmount = 0;
+          for (uint256 day = beginDay; day < beginDay.add(dayData); day++) {
+            totalIntrestAmount = dailyRewardRecords[day].mul(stakeShare);
+            // totalIntrestAmount = totalIntrestAmount.div(dayTotalStakedShare[day]);
+            }
+        return totalIntrestAmount;
+    }
+
+    function earlyPenaltyForShort(stakeRecord memory stakeData,uint256 totalIntrestAmount) public view returns(uint256){
+            uint256 emergencyDayEnd = findDayDiff(stakeData.currentTime);
+            uint256 penalty;
+            if(emergencyDayEnd == 0){
+                uint256 estimatedAmount = findEstimatedIntrest(stakeData.stakeShare,stakeData.startDay);
+                estimatedAmount = estimatedAmount.mul(90);
+                penalty = estimatedAmount;
+            }
+
+            if(emergencyDayEnd < 90 && emergencyDayEnd !=0){
+                penalty = totalIntrestAmount.mul(90);
+                penalty = penalty.div(emergencyDayEnd);
+               
+            }
+
+            if(emergencyDayEnd == 90){
+                penalty = totalIntrestAmount;
+                
+            }
+
+            if(emergencyDayEnd > 90){
+                uint256 rewardTo90Days = getDayRewardForPenalty(stakeData.startDay,stakeData.stakeShare,89);
+                 penalty = totalIntrestAmount.sub(rewardTo90Days);
+            }
+            return penalty;
+    }
+
+    function earlyPenaltyForLong(stakeRecord memory stakeData,uint256 totalIntrestAmount) public view returns(uint256){
+            uint256 emergencyDayEnd = findDayDiff(stakeData.currentTime);
+            uint256 endDay = stakeData.numOfDays;
+            uint256 halfOfStakeDays = endDay.div(2);
+            uint256 penalty ;
+            if(emergencyDayEnd == 0){
+                uint256 estimatedAmount = findEstimatedIntrest(stakeData.stakeShare,stakeData.startDay);
+                estimatedAmount = estimatedAmount.mul(halfOfStakeDays);
+                penalty = estimatedAmount;
+            }
+
+            if(emergencyDayEnd < halfOfStakeDays && emergencyDayEnd != 0){
+                penalty = totalIntrestAmount.mul(halfOfStakeDays);
+                penalty = penalty.div(emergencyDayEnd);
+            }
+
+            if(emergencyDayEnd == halfOfStakeDays){
+                penalty = totalIntrestAmount;
+                
+            }
+
+            if(emergencyDayEnd > halfOfStakeDays){
+                uint256 rewardToHalfDays = getDayRewardForPenalty(stakeData.startDay,stakeData.stakeShare,halfOfStakeDays);
+                penalty = totalIntrestAmount.sub(rewardToHalfDays);   
+            }
+            return penalty;
+    }
+
+    function latePenalties (stakeRecord memory stakeData,uint256 totalAmountReturned) public  returns(uint256){
+            uint256 dayAfterEnd = findDayDiff(stakeData.endDayTimeStamp);
+            if(dayAfterEnd > 14){
+            uint256 transferAmount = totalAmountReturned;
+            uint256 perDayDeduction = 143 ;
+            uint256 penalty = transferAmount.mul(perDayDeduction);
+            penalty = penalty.div(1000); 
+            penalty = penalty.div(100);
+            uint256 totalPenalty = dayAfterEnd.mul(penalty);
+            uint256 halfOfPenalty = totalPenalty.div(2);
+            totalPenalties = totalPenalties.add(halfOfPenalty);
+            originAmount = originAmount.add(halfOfPenalty);
+            uint256 actualAmount = 0;
+            if(totalPenalty < totalAmountReturned){
+            actualAmount = totalAmountReturned.sub(totalPenalty);
+            }
+            return actualAmount;
+            }
+            else{
+            return totalAmountReturned;
+            }
+    } 
+
+    function settleStakes (address _sender,uint256 id) internal  {
+        stakeRecord[] memory myRecord = stakeHolders[_sender];
+        for(uint i=0; i<myRecord.length; i++){
+            if(myRecord[i].id == id){
+                myRecord[i].claimed = true;
+                stakeHolders[_sender][i] = myRecord[i];
+            }
+        }
+    }
+
+    function claimStakeReward (uint id) public  {
+        (bool _isStakeholder, ) = isStakeholder(msg.sender);
+        require(_isStakeholder,'Not SH');
+        stakeRecord[] memory myRecord2 = stakeHolders[msg.sender];
+        stakeRecord memory stakeData;
+        for(uint i=0; i<myRecord2.length; i++){
+            if(myRecord2[i].id == id){
+                stakeData = myRecord2[i];
+            }
+        }
+        uint256 totalIntrestAmount = getAllDayReward(stakeData.startDay,stakeData.endDay,stakeData.stakeShare);
+        if(block.timestamp < stakeData.endDayTimeStamp){
+            if(stakeData.numOfDays < 180){
+                uint256 penalty = earlyPenaltyForShort(stakeData,totalIntrestAmount); 
+                uint256 halfOfPenalty = penalty.div(2);
+                totalPenalties = totalPenalties.add(halfOfPenalty);
+                originAmount = originAmount.add(halfOfPenalty); 
+                uint256 compeleteAmount = stakeData.stakeAmount.add(totalIntrestAmount);
+                uint256 amountToMint = 0;
+                if(penalty < compeleteAmount){ 
+                amountToMint = compeleteAmount.sub(penalty);
+                }
+                mintAmount(msg.sender,amountToMint);
+            }
+            
+            if(stakeData.numOfDays >= 180){
+                uint256 penalty = earlyPenaltyForLong(stakeData,totalIntrestAmount); 
+                uint256 halfOfPenalty = penalty.div(2);
+                totalPenalties = totalPenalties.add(halfOfPenalty);
+                originAmount = originAmount.add(halfOfPenalty); 
+                uint256 compeleteAmount = stakeData.stakeAmount.add(totalIntrestAmount);
+                uint256 amountToMint = 0;
+                if(penalty < compeleteAmount){ 
+                amountToMint = compeleteAmount.sub(penalty);
+                }
+                mintAmount(msg.sender,amountToMint);
+            }
+        }
+
+        if(block.timestamp >= stakeData.endDayTimeStamp){
+         uint256 totalAmount = stakeData.stakeAmount.add(totalIntrestAmount);
+         uint256 amounToMinted = latePenalties(stakeData,totalAmount);
+         mintAmount(msg.sender,amounToMinted);
+        }
+        // dayTotalStakedShare[day] = dayTotalStakedShare[day].sub(stakeData.stakeShare);
+        settleStakes(msg.sender,id);
+
+    }
+
+    function getStakeRecords() public view returns (stakeRecord[] memory stakeHolder) {
+        
+        return stakeHolders[msg.sender];
+    }
+
+    //   function getStakeShareRecords(uint256 dayNum) public view returns (TotalStakedShareRecord[] memory data){
+    //     return dayTotalStakedShare[dayNum];
+    // }
+
+    // function getDayTotalStakedShare(uint256 day) public view returns (TotalStakedShareRecord[] memory data){
+    //     TotalStakedShareRecord[] memory recordToAdd;
+    //     TotalStakedShareRecord[] memory records = dayTotalStakedShare[day];
+    //     if(records.length > 0){
+    //         for(uint i = 0; i<records.length; i++){
+    //             if(records[i].endDay != day){
+    //                 recordToAdd[i] = records[i];
+    //             }
+    //         }
+    //     }
+    //     return recordToAdd;
+    // }
+
+    // function setStakeTotalShare(uint256 day) internal onlyOwner{
+    //     require(day > 1,"Not set supply now");
+    //     uint256 prevDay = day.sub(1);
+    //     TotalStakedShareRecord[] memory records = getDayTotalStakedShare(prevDay);
+    //     dayTotalStakedShare[day] = records;
+    // }
+    //Free Stake functionality
+    function isFreeStakeholder(address _address) public view returns(bool, uint256) { 
+        for (uint256 s = 0; s < freeStakeholders.length; s += 1){
+            if (_address == freeStakeholders[s]) return (true, s);
+        }
+        return (false, 0);
+    }
+
+    function createFreeStakeRecord(address freeStakeHolder,string memory btcAddress,uint256 day,uint256 balance) internal onlyOwner{
+
+        freeStakePerDayInfo memory myRecord = freeStakePerDayInfo({walletAddress:freeStakeHolder,balanceAtMoment:balance,btcAddress:btcAddress,dayFreeStake:day});
+        freeStakeRecords[day].push(myRecord);
+    }
+
+    function createFreeStake(address user,string memory btcAddress,uint balance) public onlyOwner{
+        require(block.timestamp < startDate + 31536000,'Free stakes available just 1 year');
+        require(block.timestamp >= startDate ,'Free stakes not started yet');
+        require(balance > 0, 'You need to have more than 0 Btc in your wallet');
+        address ownerAddress = owner();
+        require(ownerAddress != user, 'Owner not allowed');
+        (bool _isFreeStakeholder, ) = isFreeStakeholder(user);
+        if(!_isFreeStakeholder){
+            freeStakeholders.push(user);
+        }
+        uint day = findDay();
+        balanceAtFreeStake[user] = balanceAtFreeStake[user].add(balance);
+        createFreeStakeRecord(user,btcAddress,day,balance); 
+        claimedBtcAddrCount ++ ;
+        unClaimedBtc = unClaimedBtc.sub(balance);
+        claimedBTC = claimedBTC.add(balance);
+      
+    }
+
+    function getFreeStakeRecords(uint day) public view returns (freeStakePerDayInfo[] memory freeStakeRecord) {
+        
+        return freeStakeRecords[day];
+    }
+
+    function getRefererAddress(address sender) public view returns(address){
+        return referalAddress[sender];
+    }
+
+    function findUserReferal(address user) public view returns (address){
+        address referer = getRefererAddress(user);
+        return referer;
+
+    }
+
+    function findSillyWhalePenalty(uint256 amount) public pure returns (uint256){
+        if(amount < 1000e8){
+            return amount;
+        }
+        else if(amount >= 1000e8 && amount < 10000e8){  
+            uint256 penaltyPercent = amount.sub(1000e8);
+            penaltyPercent = penaltyPercent.mul(25 * 10 ** 2);
+            penaltyPercent = penaltyPercent.div(9000e8); 
+            penaltyPercent = penaltyPercent.add(50 * 10 ** 2); 
+            uint256 deductedAmount = amount.mul(penaltyPercent); 
+            deductedAmount = deductedAmount.div(10 ** 4);          
+            uint256 adjustedBtc = amount.sub(deductedAmount);  
+            return adjustedBtc;   
+        }
+        else { 
+            uint256 adjustedBtc = amount.mul(25);
+            adjustedBtc = adjustedBtc.div(10 ** 2);
+            return adjustedBtc;  
+        }
+    }
+
+    function findLatePenaltiy(uint256 dayPassed) public pure returns (uint256){
+        uint256 totalDays = 350;
+        uint256 latePenalty = totalDays.sub(dayPassed);
+        latePenalty = latePenalty.mul( 10 ** 4);
+        latePenalty = latePenalty.div(350);
+        return latePenalty; 
+    }
+
+    function findSpeedBonus(uint256 day,uint256 share) public pure returns (uint256){
+      uint256 speedBonus = 0;
+      uint256 initialAmount = share;
+      uint256 percentValue = initialAmount.mul(20);
+      uint256 perDayValue = percentValue.div(350);  
+      uint256 deductedAmount = perDayValue.mul(day);      
+      speedBonus = percentValue.sub(deductedAmount);
+      return speedBonus;
+
+    }
+
+    function findReferalBonus(address user,uint256 share,address referer) public pure returns(uint256) { 
+       uint256 fixedAmount = share;
+       uint256 sumUpAmount = 0;
+      if(referer != address(0)){
+       if(referer != user){
+         
+        // if referer is not user it self
+        uint256 referdBonus = fixedAmount.mul(10);
+        referdBonus = referdBonus.div(100);
+        sumUpAmount = sumUpAmount.add(referdBonus);
+       }
+       else{
+        // if a user referd it self  
+        uint256 referdBonus = fixedAmount.mul(20);
+        referdBonus = referdBonus.div(100);
+        sumUpAmount = sumUpAmount.add(referdBonus);
+        }
+       }
+       return sumUpAmount;
+    }
+
+    function createReferalRecords(address refererAddress, address referdAddress,uint256 awardedPTP) public {
+        uint day = findDay();
+        referalsRecord memory myRecord = referalsRecord({referdAddress:referdAddress,day:day,awardedPTP:awardedPTP});
+        referals[refererAddress].push(myRecord);
+    }
+
+    function createFreeStakeClaimRecord(address userAddress,string memory btcAddress,uint256 day,uint256 balance,uint256 claimedAmount) internal onlyOwner{
+
+     freeStakeClaimInfo memory myRecord = freeStakeClaimInfo({btcAddress:btcAddress,balanceAtMoment:balance,dayFreeStake:day,claimedAmount:claimedAmount,rawBtc:unClaimedBtc});
+     freeStakeClaimRecords[userAddress].push(myRecord);
+    }
+
+    function freeStaking(uint256 stakeAmount,address userAddress) internal onlyOwner {
+        uint256 id = generateId();
+        uint256 dayInYear = 365;
+        uint256 startDay = findDay();
+        uint256 endDay = startDay.add(dayInYear);   
+        uint256 endDayTimeStamp = findEndDayTimeStamp(endDay);
+        // uint256 roiPercent = findPercentSlot();
+        // uint256 BPB = findBiggerPayBetter(stakeAmount);
+        stakerPool = stakerPool.add(stakeAmount);        
+        // originAmount = originAmount.add(BPB);
+        // uint256 LPB = findLongerPaysBetter(stakeAmount,dayInYear);
+        // originAmount = originAmount.add(LPB);
+        uint256 share = generateShare(stakeAmount,0,0);
+
+        stakeRecord memory myRecord = stakeRecord({id:id,stakeShare:share, stakeName:'', numOfDays:dayInYear,
+         currentTime:block.timestamp,claimed:false,startDay:startDay,endDay:endDay,
+        endDayTimeStamp:endDayTimeStamp,isFreeStake:true,stakeAmount:stakeAmount});
+        stakeHolders[userAddress].push(myRecord); 
+
+    }
+
+    function distributeFreeStake(uint256 day) public  onlyOwner {
+        //  require(block.timestamp < startDate + 31536000,'End');
+         bool _findDay = checkFreeStakeDay[day]; 
+         require(!_findDay,"can't set again");
+         checkFreeStakeDay[day] = true;
+         freeStakePerDayInfo[] memory freeStakeRecord = getFreeStakeRecords(day);
+         if(freeStakeRecord.length > 0) {    
+             for(uint i = 0; i < freeStakeRecord.length; i++){
+                address userReferer = findUserReferal(freeStakeRecord[i].walletAddress);
+                uint256 balance = freeStakeRecord[i].balanceAtMoment;
+                uint256 sillyWhaleValue = findSillyWhalePenalty(balance);
+                uint share = sillyWhaleValue * 10 ** 8;
+                share = share.div(10 ** 4);
+                uint256 actualAmount = share;  
+                uint256 latePenalty = findLatePenaltiy(freeStakeRecord[i].dayFreeStake);
+                actualAmount = actualAmount.mul(latePenalty);
+                //Late Penalty return amount in 4 decimal to avoid decimal issue,
+                // we didvide with 10 ** 4 to find actual amount 
+                actualAmount = actualAmount.div(10 ** 4);
+                //Speed Bonus
+               
+                uint256 userSpeedBonus = findSpeedBonus(freeStakeRecord[i].dayFreeStake,actualAmount);
+                userSpeedBonus = userSpeedBonus.div(100);
+                actualAmount = actualAmount.add(userSpeedBonus);
+                originAmount = originAmount.add(actualAmount);
+
+                uint256 refBonus = 0;
+                address userAddress = freeStakeRecord[i].walletAddress;
+                string memory btcAddress = freeStakeRecord[i].btcAddress;
+                uint256 balanceAtMoment = freeStakeRecord[i].balanceAtMoment;
+                uint256 dayFreeStake = freeStakeRecord[i].dayFreeStake;  
+           //Referal Mints 
+            if(userReferer != userAddress && userReferer != address(0)){
+                uint256 amount = share;
+                uint256 referingBonus = amount.mul(20);
+                referingBonus = referingBonus.div(100);
+                originAmount = originAmount.add(referingBonus);
+                mintAmount(userReferer,referingBonus);
+           }
+        
+         //Referal Bonus
+            if(userReferer != address(0)){
+            refBonus = findReferalBonus(userAddress,share,userReferer);
+            actualAmount = actualAmount.add(refBonus);
+            originAmount = originAmount.add(refBonus);
+            createReferalRecords(userReferer,userAddress,refBonus);
+          }
+         uint256 mintedValue = actualAmount.mul(10); 
+         mintedValue = mintedValue.div(100);
+         mintAmount(userAddress,mintedValue); 
+         createFreeStakeClaimRecord(userAddress,btcAddress,dayFreeStake,balanceAtMoment,mintedValue);
+
+         uint256 stakeAmount = actualAmount.mul(90);
+         stakeAmount = stakeAmount.div(100); 
+         freeStaking(stakeAmount,userAddress);
+
+            }
+         
+        }
+
+    }
+
+    function getFreeStakeClaimRecord() public view returns (freeStakeClaimInfo[] memory claimRecords){
+       return freeStakeClaimRecords[msg.sender];
+    } 
+
+    function extendStakeLength(uint256 totalDays, uint256 id) public { 
+        stakeRecord[] memory myRecord = stakeHolders[msg.sender];
+        for(uint i=0; i<myRecord.length; i++){
+            if(myRecord[i].id == id){
+                if(myRecord[i].isFreeStake){
+                    if(totalDays >= 365){
+                        require(myRecord[i].startDay + totalDays > myRecord[i].numOfDays , 'condition should not be meet');
+                        myRecord[i].numOfDays = myRecord[i].startDay + totalDays;
+                        myRecord[i].endDay = (myRecord[i].startDay).add(totalDays);
+                        myRecord[i].endDayTimeStamp = findEndDayTimeStamp(myRecord[i].endDay);
+                    }
+                }
+                else{
+                    if(totalDays >= 1){
+                        require(myRecord[i].startDay + totalDays > myRecord[i].numOfDays , 'condition should not be meet');
+                        myRecord[i].numOfDays = myRecord[i].startDay + totalDays;
+                        myRecord[i].endDay = (myRecord[i].startDay).add(totalDays);
+                        myRecord[i].endDayTimeStamp = findEndDayTimeStamp(myRecord[i].endDay);
+                    }
+                }
+           stakeHolders[msg.sender][i] = myRecord[i];
+            }
+        }
+    }
+
+    function findAddress(uint256 day, address sender)public view returns(bool){
+        address addressValue = AARecords[day][sender].user;
+        if(addressValue == address(0)){
+            return false;
+        }
+        else{
+           return true;
+        }
+    }
+
+    function addRecord (address _sender, uint256 _amount) internal {
+        require(_amount > 0, '0 Balance');
+        uint day = findDay();
+        address refererAddress = getRefererAddress(_sender);
+        RecordInfo memory myRecord = RecordInfo({amount: _amount, time: block.timestamp, claimed: false, user:_sender,refererAddress:refererAddress});
+        bool check = findAddress(day,_sender);
+        if(check == false){
+            AARecords[day][_sender] = myRecord;
+            perDayAARecords[day].push(_sender);
+        }  
+        else{
+            RecordInfo memory record = AARecords[day][_sender];
+            record.amount = record.amount.add(_amount);
+            AARecords[day][_sender] = record;
+        }
+      
+        totalETH[day] = totalETH[day] + _amount;
+    }
+
+    function setAvailabePTP (uint256 day) public onlyOwner {
+       //  require(block.timestamp < startDate + 31536000,'END');
+        uint256 hexAvailabel = 0;
+       
+        uint256 firstDayAvailabilty = 1000000000 * 10 ** 8; 
+        if(day == 0){
+            hexAvailabel = firstDayAvailabilty;
+        }
+        else{
+            uint256 othersDayAvailability = unClaimedBtc;
+            //as per rules we have to multiply it with 10^8 than divided with 10 ^ 4 but as we can make it multiply 
+            //with 10 ^ 4
+            othersDayAvailability = othersDayAvailability.mul(10 ** 4);
+            hexAvailabel = othersDayAvailability.div(350);
+            if(day > 1){
+                unclaimedRecord(day);
+            }
+        }
+ 
+        bool _findDay = checkDay[day]; 
+        require(!_findDay,"can't set again");
+        totalHexAvailable[day] = totalHexAvailable[day].add(hexAvailabel);
+        checkDay[day] = true;
+    }
+
+    function getTotalBNB (uint day) public view returns (uint256){
+       return totalETH[day];
+    }
+
+    function getAvailablePTP (uint day) public view returns (uint256){
+       return totalHexAvailable[day];
+    }
+
+    function getTransactionRecords(uint day,address user) public view returns (RecordInfo memory record) {   
+            return AARecords[day][user];
+    }
+
+    function countShare (uint256 userSubmittedBNB, uint256 dayTotalBNB, uint256 availablePTP) public pure returns  (uint256) {
+        uint256 share = 0;
+        share = userSubmittedBNB.div(dayTotalBNB);
+        share = share.mul(availablePTP);
+        return share;
+    }
+
+    function settleSubmission (uint day, address user) internal  {
+        RecordInfo memory myRecord = AARecords[day][user];
+                 myRecord.claimed = true;
+                 AARecords[day][user] = myRecord;
+    }
+
+    function claimAATokens () public {
+        uint256 presentDay = findDay();
+        require(presentDay > 0,'not now');
+        uint256 prevDay = presentDay.sub(1);
+        uint256 dayTotalBNB = getTotalBNB(prevDay);
+        uint256 availablePTP = getAvailablePTP(prevDay);
+        RecordInfo memory record = getTransactionRecords(prevDay,msg.sender);
+        if(record.user != address(0) && record.claimed == false){
+           uint256 userSubmittedBNB = record.amount;
+           uint256 userShare = 0;
+           uint256 referalBonus = 0;
+           userShare = countShare(userSubmittedBNB,dayTotalBNB,availablePTP);
+            address userReferer = findUserReferal(msg.sender);
+             if(userReferer != msg.sender && userReferer !=address(0)){
+             uint256 amount = userShare;
+             uint256 referingBonus = amount.mul(20);
+             referingBonus = referingBonus.div(100);
+             originAmount = originAmount.add(referingBonus);
+             mintAmount(userReferer,referingBonus);
+             createReferalRecords(userReferer,msg.sender,referingBonus);
+             }
+            referalBonus =  findReferalBonus(msg.sender,userShare,userReferer);  
+             userShare = userShare.add(referalBonus);
+             originAmount = originAmount.add(referalBonus);
+             mintAmount(msg.sender,userShare);
+             settleSubmission(prevDay,msg.sender);
+             if(userReferer != address(0)){
+            createReferalRecords(userReferer,msg.sender,referalBonus);
+             }
+        }
+    }
+
+    function foundUserReferals(address sender) public view returns(address[] memory a) {
+     address[] memory userReferalAccounts = new address[](referAddresses.length);
+        for(uint i = 0; i< referAddresses.length; i++){
+            if(referalAddress[referAddresses[i]] == sender){
+                userReferalAccounts[i]=referAddresses[i];
+            }
+        }
+        return userReferalAccounts;
+    }
+
+    function getReferalRecords(address refererAddress) public view returns (referalsRecord[] memory referal) {
+        
+        return referals[refererAddress];
+    }
+
+    function unclaimedRecord(uint256 presentDay) internal onlyOwner {
+        uint256 prevDay = presentDay.sub(2);
+        uint256 dayTotalBNB = getTotalBNB(prevDay);
+        uint256 availablePTP = getAvailablePTP(prevDay);
+        address[] memory allUserAddresses = perDayAARecords[prevDay];
+        if(allUserAddresses.length > 0){
+            for(uint i = 0; i < allUserAddresses.length; i++){
+                uint256 userSubmittedBNB = 0;
+                uint256 userShare = 0;
+                RecordInfo memory record = getTransactionRecords(prevDay,allUserAddresses[i]);
+                if(record.claimed == false){
+                    userSubmittedBNB = record.amount;
+                    userShare = countShare(userSubmittedBNB,dayTotalBNB,availablePTP);
+                    unclaimedAAToken = unclaimedAAToken.add(userShare);
+                    settleSubmission(prevDay,allUserAddresses[i]);
+                }
+            
+            } 
+        }  
+        else{
+         unclaimedAAToken = unclaimedAAToken.add(availablePTP);
+        }
+    }
+
+    function transferPTP(address recipientAddress, uint256 _amount) public{
+        _transfer(msg.sender,recipientAddress,_amount);
+        transferInfo memory myRecord = transferInfo({amount: _amount,to:recipientAddress, from: msg.sender});
+        transferRecords[msg.sender].push(myRecord);
+    }
+
+    function getTransferRecords( address _address ) public view returns (transferInfo[] memory transferRecord) {
+        return transferRecords[_address];
+    }
+    //Origin Amount
+    function getOriginAmount() public view returns (uint256){
+        return originAmount;
+    }
+
+    function setBigPayDay() public onlyOwner{
+        uint256 btc = unClaimedBtc.div(10 ** 8);
+        uint256 bigPayDayAmount = btc.mul(2857);
+        //it should be divieded with 10 ** 6 but we have to convert it in hex so we div it 10 ** 2
+
+        bigPayDayAmount = bigPayDayAmount.div(10 ** 2);
+        unclaimed_BTC_Payout_Bucket = unclaimed_BTC_Payout_Bucket.add(bigPayDayAmount);
+    }
+
+    function getBigPayDay() public view returns (uint256){
+        return unclaimed_BTC_Payout_Bucket;
+    }
+}

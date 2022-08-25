@@ -1,0 +1,814 @@
+// function countBigPayDayShare (uint256 userSubmittedBNB, uint256 dayTotalBNB) internal  view returns  (uint256) {
+    //     uint256 share = 0;
+    //     share = userSubmittedBNB.div(dayTotalBNB);
+    //     share = share.mul(bigPayDay);
+    //     return share * 10 ** 8;
+    // }
+
+    // function bigPayDayDistribute() public onlyOwner{
+    // //   require(block.timestamp < startDate + 31708800,'Free stakes available just 1 year');
+    //   RecordInfo[] memory userRecords = getTransactionRecords(365);
+    //     for(uint i = 0; i < userRecords.length; i++){
+    //         uint256 userSubmittedBNB = userRecords[i].amount;
+    //         uint256 dayTotalBNB = getTotalBNB(365);
+    //         uint256 userShare = countBigPayDayShare(userSubmittedBNB,dayTotalBNB);
+    //         mintAmount(userRecords[i].user, userShare);
+    //     }
+
+    // }
+
+}
+
+// contract TestPTP is ERC20, Ownable {
+//     using SafeMath for uint256;
+//     struct transferInfo {
+//         address to;
+//         address from; 
+//         uint256 amount;
+//     }
+
+//     struct freeStakePerDayInfo {
+//         address walletAddress;
+//         uint256 balanceAtMoment;
+//         uint256 claimedAmount;
+//         uint transactDay;
+//     }
+
+//     struct stakeRecord {
+//        uint256 stakeAmount;
+//        uint numOfDays;
+//        uint256 currentTime;
+//        bool claimed;
+//        uint256 id;
+//        uint256 startDay;
+//        uint256 endDay;
+//        uint256 endDayTimeStamp;
+//        bool isFreeStake;
+//        uint256 poolROIPercentSlot;
+//        string stakeName;
+       
+//     }   
+//     //Adoption Amplifier Struct
+//     struct RecordInfo {
+//         uint256 amount;
+//         uint256 time;
+//         bool claimed;
+//         address user;
+//         address refererAddress;
+//     }
+
+//     struct referalsRecord {
+//         address referdAddress;
+//         uint256 day;
+//         uint256 awardedPTP;
+//     }
+
+    
+//     //Adoption Amplifier
+//     address[] private allAddresses;
+//     address[] private referAddresses;
+//     mapping (uint => RecordInfo[]) public records;
+//     mapping (address => referalsRecord[]) public referals;
+//     mapping (uint => uint256) public totalETH;
+//     mapping (uint => uint256) public totalHexAvailable;
+//     mapping (uint => bool) public checkDay;
+//     mapping (uint => bool) public checkFreeStakeDay;
+//     mapping(address => address) internal referalAddress;
+//     event Received(address, uint256);
+
+//     //Token Data
+//     address[] internal stakeAddress;
+//     mapping(address => uint256) internal stakes;
+//     mapping(address => uint256) internal rewards;
+
+//     mapping(address => stakeRecord[]) public  stakeHolders;
+
+//     mapping (address => transferInfo[]) public transferRecords;
+//     address[] internal freeStakeholders;
+//     mapping (uint => freeStakePerDayInfo[]) public freeStakeRecords;
+//     mapping(address => uint256) internal freeStakes;
+//     mapping(address => uint256) internal balanceAtFreeStake;
+//     mapping (address => uint256) internal onDayFreeStake;
+
+//     uint256 startDate = 1647501600;
+//     uint256 counterId = 0;
+//     address originAddress = 0x6b26678F4f392B0E400CC419FA3E5161759ca380;
+//     uint256 originAmount = 0;
+//     uint256 totalStakedAmount = 0;
+//     uint256 totalPenalties = 0;
+//     uint256 testingData = 0;
+//     uint256 ptpForBtc = 10000 ;
+//     uint256 bigPayDay = 0;
+//     constructor() ERC20("10Pantacles", "PTP")  {
+//     }
+//     //Transfer Functionality
+//     function transferPTP(address recipientAddress, uint256 _amount) public{
+//         _transfer(msg.sender,recipientAddress,_amount);
+//         transferInfo memory myRecord = transferInfo({amount: _amount,to:recipientAddress, from: msg.sender});
+//         transferRecords[msg.sender].push(myRecord);
+//     }
+
+//     function getTransferRecords( address _address ) public view returns (transferInfo[] memory transferRecord) {
+//         return transferRecords[_address];
+//     }
+//     //Minting
+//      function mintAmount(address user, uint256 amount) internal {
+//          _mint(user,amount);
+//     }
+//     //Stake Functionality
+  
+//     function findPercentSlot() public view returns(uint256){
+//         uint256 rawValue = 369;
+//         uint256 intrestRateCalc = 100 * 10 ** 3;
+
+//         uint256 totalMinted = totalSupply();
+//         if(totalMinted == 0 && totalStakedAmount==0){
+//             return 0;
+//         }
+//         else{
+//         uint256 stakeAmountPercent = totalStakedAmount.add(totalPenalties);
+//         uint256 totalSupplyAmount = totalMinted.add(stakeAmountPercent);
+//         uint256 percentAmount = stakeAmountPercent.mul(100);
+//         percentAmount = percentAmount.div(totalSupplyAmount);
+//         if(percentAmount == 0){
+//             percentAmount = 1;
+//         }
+//        uint256 valueOfIntrest = intrestRateCalc.div(percentAmount) ;
+//         valueOfIntrest = valueOfIntrest.mul(rawValue) * 10 ** 3;
+//         valueOfIntrest = valueOfIntrest.div(100);
+//         valueOfIntrest = valueOfIntrest.div(1000); 
+//         return valueOfIntrest ; 
+//         }   
+//     }
+
+//     function findDayDiff(uint256 endDayTimeStamp) public view returns(uint) {
+//         uint day = block.timestamp.sub(endDayTimeStamp);
+//         day = day.div(180);
+//         return day;
+//     }
+    
+//     function isStakeholder(address _address) public view returns(bool, uint256) { 
+
+//         for (uint256 s = 0; s < stakeAddress.length; s += 1){
+//             if (_address == stakeAddress[s]) return (true, s);
+//         }
+//         return (false, 0);
+//     }
+     
+//     function addStakeholder(address _stakeholder) public {
+//         (bool _isStakeholder, ) = isStakeholder(_stakeholder);
+//         if(!_isStakeholder){
+//             stakeAddress.push(_stakeholder);
+//         }
+//     }
+
+//     function removeStakeholder(address _stakeholder) public onlyOwner {
+//         (bool _isStakeholder, uint256 s) = isStakeholder(_stakeholder);
+//         if(_isStakeholder){
+//             stakeAddress[s] = stakeAddress[stakeAddress.length - 1];
+//             stakeAddress.pop();
+//         }
+//     }
+
+//     function generateId() public returns(uint256) {
+//         return counterId++;
+//     } 
+    
+//     function calculateReward(uint256 amount, uint256 day, uint256 poolROIPercent) public view returns(uint256) {
+//         uint256 amountPercent = amount.mul(poolROIPercent);
+//         amountPercent = amountPercent.div(1000) ;  
+//         amountPercent = amountPercent.div(100) ; 
+//         amountPercent = amountPercent;
+//         uint256 perDayReward = amountPercent.div(365);
+//         uint256 reward = day.mul(perDayReward); 
+//         return reward ;
+
+//     }
+
+//     function findEndDayTimeStamp(uint256 day) public view returns(uint256){
+//        uint256 futureDays = day.mul(180);
+//        futureDays = block.timestamp.add(futureDays);
+//        return futureDays;
+//     }
+
+//     function createStake(uint256 _stake,uint day,string memory stakeName) public {
+//         uint256 balance = balanceOf(msg.sender);
+//         require(balance >= _stake,'Not enough amount for staking');
+//         (bool _isStakeholder, ) = isStakeholder(msg.sender);
+//         if(! _isStakeholder) addStakeholder(msg.sender);
+//          _burn(msg.sender,_stake);
+//         uint256 id = generateId();
+//         uint256 currentDay = findDay();
+//         uint256 endDay = currentDay.add(day);
+//         uint256 endDayTimeStamp = findEndDayTimeStamp(day);
+//         uint256 roiPercent = findPercentSlot();
+//          totalStakedAmount = totalStakedAmount.add(_stake);
+//         stakeRecord memory myRecord = stakeRecord({id:id,stakeAmount:_stake,stakeName:stakeName, numOfDays:day, currentTime:block.timestamp,claimed:false,startDay:currentDay,endDay:endDay,
+//         endDayTimeStamp:endDayTimeStamp,isFreeStake:false,poolROIPercentSlot:roiPercent});
+//         stakeHolders[msg.sender].push(myRecord);
+//     }
+
+//     function getStakeRecords() public view returns (stakeRecord[] memory stakeHolder) {
+        
+//         return stakeHolders[msg.sender];
+//     }
+
+//     function settleStakes (address _sender,uint256 id) internal  {
+//         stakeRecord[] memory myRecord = stakeHolders[_sender];
+//         for(uint i=0; i<myRecord.length; i++){
+//             if(myRecord[i].id == id){
+//                 myRecord[i].claimed = true;
+//                 stakeHolders[_sender][i] = myRecord[i];
+//             }
+//         }
+//     }
+
+//     function claimStakeReward(uint256 id) public  {
+//         (bool _isStakeholder, ) = isStakeholder(msg.sender);
+//         require(_isStakeholder,'Not a stake Holder');
+//         stakeRecord[] memory myRecord = stakeHolders[msg.sender];
+//         uint256 poolROIPercentSlot = myRecord[id].poolROIPercentSlot;
+//         uint256 reward = calculateReward(myRecord[id].stakeAmount, myRecord[id].numOfDays,poolROIPercentSlot);
+//         //on end Day
+//         if(block.timestamp == myRecord[id].endDayTimeStamp){
+//           uint256  mintedToken = reward.add(myRecord[id].stakeAmount);
+//             mintAmount(msg.sender,mintedToken);
+            
+//         }
+//         //after end day
+//         if(block.timestamp > myRecord[id].endDayTimeStamp){
+//             uint256 dayAfterEnd = findDayDiff(myRecord[id].endDayTimeStamp);
+//             if(dayAfterEnd > 140){
+//             uint256 transferAmount = reward.add(myRecord[id].stakeAmount);
+//             uint256 perDayDeduction = 143 ;
+//             uint256 penalty = transferAmount.mul(perDayDeduction);
+//             penalty = penalty.div(1000); 
+//             penalty = penalty.div(100);
+//             uint256 totalPenalty = dayAfterEnd.mul(penalty);
+//             uint256 halfOfPenalty = totalPenalty.div(2);
+//             totalPenalties = totalPenalties.add(halfOfPenalty);
+//             originAmount = originAmount.add(halfOfPenalty);
+//             uint256 mintedToken = transferAmount.sub(totalPenalty);
+//             mintAmount(msg.sender,mintedToken);
+//             }
+//             else{
+//             uint256 mintedToken = reward.add(myRecord[id].stakeAmount);    
+//             mintAmount(msg.sender,mintedToken);
+//             }
+//         }
+
+//         //Emergency End Stake
+//         if(block.timestamp < myRecord[id].endDayTimeStamp){
+//             uint256 emergencyDayEnd = findDayDiff(myRecord[id].currentTime);
+//             uint256 endDay = myRecord[id].numOfDays;
+//             uint256 halfOfStakeDays = endDay.div(2);
+//             uint256 penalty = 0;
+//             uint256 intrest = calculateReward(myRecord[id].stakeAmount, emergencyDayEnd,poolROIPercentSlot);
+//             uint256 totalStaked = myRecord[id].stakeAmount;
+//             //if served day equal to half days
+//             if(emergencyDayEnd == halfOfStakeDays){
+//                 uint256 halfPenalty = intrest.div(2);
+//                 totalPenalties = totalPenalties.add(halfPenalty);
+//                 originAmount = originAmount.add(halfPenalty);
+//                 mintAmount(msg.sender,totalStaked);
+//             }
+//             //If served days less than half day
+//          if(emergencyDayEnd < halfOfStakeDays){
+//             //If half of total days less than 90
+//              if(halfOfStakeDays < 90){
+//                 uint256 calcPenalty = intrest.mul(90);
+//                 penalty = calcPenalty.div(emergencyDayEnd);
+//                 uint256 halfPenalty = penalty.div(2);
+//                 totalPenalties = totalPenalties.add(halfPenalty);
+//                 originAmount = originAmount.add(halfPenalty);
+//                 uint256 ptpRecivedBack = totalStaked.add(intrest);
+//                 ptpRecivedBack = ptpRecivedBack.sub(penalty);
+//                 if(ptpRecivedBack < 0){
+//                     ptpRecivedBack = 0;
+//                 }
+//                 else{
+//                 mintAmount(msg.sender,ptpRecivedBack);}
+//              }
+//             //if half of total days greater or equal to 90
+//              else{
+//                 uint256 calcPenalty = intrest.mul(halfOfStakeDays);
+//                 penalty = calcPenalty.div(emergencyDayEnd);
+//                 uint256 halfPenalty = penalty.div(2);
+//                 totalPenalties = totalPenalties.add(halfPenalty);
+//                 originAmount = originAmount.add(halfPenalty);
+//                 uint256 ptpRecivedBack = totalStaked.add(intrest);
+//                 ptpRecivedBack = ptpRecivedBack.sub(penalty);
+//                 if(ptpRecivedBack < 0){
+//                     ptpRecivedBack = 0;
+//                 }
+//                 else{
+//                 mintAmount(msg.sender,ptpRecivedBack);}
+//              }
+//          }
+//             // mintAmount(msg.sender,reward);
+//         if(emergencyDayEnd > halfOfStakeDays){
+//             uint256 daysAfterHalf = emergencyDayEnd.sub(halfOfStakeDays);
+//             uint256 interestAccruedAfterHalf = calculateReward(totalStaked, daysAfterHalf,poolROIPercentSlot);
+//             uint256 intrestAccruedAtHalf = calculateReward(totalStaked, halfOfStakeDays,poolROIPercentSlot);
+//             uint256 halfPenalty = intrestAccruedAtHalf.div(2);
+//             totalPenalties = totalPenalties.add(halfPenalty);
+//             originAmount = originAmount.add(halfPenalty);
+//             uint256 ptpRecivedBack = interestAccruedAfterHalf.add(totalStaked);
+//             mintAmount(msg.sender,ptpRecivedBack);
+
+
+//         }
+
+        
+//         }
+        
+//         settleStakes(msg.sender,id);
+//     }
+
+//     function transferStake(uint256 id,address transferTo) public {
+//           stakeRecord[] memory myRecord = stakeHolders[msg.sender];
+//         for(uint i=0; i<myRecord.length; i++){
+//             if(myRecord[i].id == id){
+//             stakeHolders[transferTo].push(stakeHolders[msg.sender][i]); 
+//             delete(stakeHolders[msg.sender][i]);
+//             }
+//         }
+//     }
+
+//     //FreeStake Functionality
+//     function findUserReferal(address user) public view returns (address){
+//         address referer = getRefererAddress(user);
+//         return referer;
+
+//     }
+  
+//     function findReferalBonus(address user,uint256 share) public view returns(uint256) { 
+//        uint256 fixedAmount = share;
+//        uint256 sumUpAmount = 0;
+//        address referer = findUserReferal(user);
+//       if(referer != address(0)){
+//        if(referer != user){
+         
+//         // if referer is not user it self
+//         uint256 referdBonus = fixedAmount.mul(10);
+//         referdBonus = referdBonus.div(100);
+//         sumUpAmount = sumUpAmount.add(referdBonus);
+//        }
+//        else{
+        
+//         // if a user referd it self  
+         
+//         uint256 referdBonus = fixedAmount.mul(20);
+//         referdBonus = referdBonus.div(100);
+//         sumUpAmount = sumUpAmount.add(referdBonus);
+//         fixedAmount = fixedAmount.add(referdBonus);
+//         uint256 totalBonus = fixedAmount.mul(10);
+//         totalBonus = totalBonus.div(100);
+//         sumUpAmount = sumUpAmount.add(totalBonus);
+//         }
+//        }
+//        return sumUpAmount;
+//     }
+
+//     function isFreeStakeholder(address _address) public view returns(bool, uint256) { 
+//         for (uint256 s = 0; s < freeStakeholders.length; s += 1){
+//             if (_address == freeStakeholders[s]) return (true, s);
+//         }
+//         return (false, 0);
+//     }
+
+//     function getFreesStakeAddresses() public view returns (address[] memory a) {
+
+//         address[] memory allAddressData = new address[](freeStakeholders.length);
+//         for (uint i=0; i < freeStakeholders.length; i++) {
+//             allAddressData[i] = freeStakeholders[i];
+//         }
+//         return allAddressData;
+//     }
+
+//     function createFreeStake(address user,uint balance) public onlyOwner{
+//         require(block.timestamp < startDate + 31536000,'Free stakes available just 1 year');
+//         require(block.timestamp >= startDate ,'Free stakes not started yet');
+//         require(balance >= 0, 'You have more than 1 BNB in your wallet');
+//         address ownerAddress = owner();
+//         require(ownerAddress != user, 'Owner not allowed');
+//         (bool _isFreeStakeholder, ) = isFreeStakeholder(user);
+//         require(!_isFreeStakeholder, 'Already added to free stake list');
+//         uint day = findDay();
+//         freeStakeholders.push(user);
+//         balanceAtFreeStake[user] = balanceAtFreeStake[user].add(balance);
+//         onDayFreeStake[user] = day;
+      
+//     }
+
+//     function findDay() public view returns(uint) {
+//         uint day = block.timestamp.sub(startDate);
+//         day = day.div(180);
+//         return day;
+//     }
+
+//     function findSpeedBonus(uint256 day,uint256 share) public view returns (uint256){
+//       uint256 speedBonus = 0;
+//       uint256 initialAmount = share;
+//       uint256 percentValue = initialAmount.mul(20);
+//       percentValue = percentValue.div(100);
+//       uint256 perDayValue = percentValue.div(365);
+//       uint256 deductedAmount = perDayValue.mul(day);
+//       speedBonus = percentValue.sub(deductedAmount);
+//       return speedBonus;
+
+//     }
+
+//     function distributeFreeStake(uint256 day) public onlyOwner{
+//         require(block.timestamp < startDate + 31536000,'Free stakes available just 1 year');
+//         // uint day = findDay();
+//         bool _findDay = checkFreeStakeDay[day]; 
+//         require(!_findDay,'Free Stake can not distribute twice');
+//         address[] memory freeStakeUsers = getFreesStakeAddresses();
+//         checkFreeStakeDay[day] = true;
+//      if(freeStakeUsers.length > 0){
+//         for(uint i=0;i<freeStakeUsers.length; i++){
+//         uint256 freeStakeDay = onDayFreeStake[freeStakeUsers[i]];
+//         address userReferer = findUserReferal(freeStakeUsers[i]);
+//         uint256 balance = balanceAtFreeStake[freeStakeUsers[i]];
+//         uint share = balance.mul(ptpForBtc);
+//         uint256 compeleteBonus = share;
+//         uint256 refBonus = 0;
+//         address userAddress = freeStakeUsers[i];
+//         //Referal Mints
+//          if(userReferer != freeStakeUsers[i] && userReferer !=address(0)){
+//             uint256 amount = share;
+//             uint256 referingBonus = amount.mul(20);
+//             referingBonus = referingBonus.div(100);
+//             originAmount = originAmount.add(referingBonus);
+//             createReferalRecords(userReferer,freeStakeUsers[i],referingBonus);
+//             mintAmount(userReferer,referingBonus);
+//         }
+        
+//         //Referal Bonus
+   
+//         if(userReferer != address(0)){
+//          refBonus = findReferalBonus(freeStakeUsers[i],share);
+//          compeleteBonus = compeleteBonus.add(refBonus);
+//          originAmount = originAmount.add(refBonus);
+//          createReferalRecords(userReferer,freeStakeUsers[i],refBonus);
+//         }
+        
+//         //Speed Bonus
+//         uint256 userSpeedBonus = findSpeedBonus(freeStakeDay,share);
+//         compeleteBonus = compeleteBonus.add(userSpeedBonus);
+//         originAmount = originAmount.add(userSpeedBonus);
+
+//         uint256 stakeAmount = compeleteBonus.mul(90);
+//         stakeAmount = stakeAmount.div(100); 
+//         uint256 mintedValue = compeleteBonus.mul(10);
+//         mintedValue = mintedValue.div(100); 
+        
+//         //Stake Amount
+//         freeStakes[freeStakeUsers[i]] = freeStakes[freeStakeUsers[i]].add(stakeAmount);
+//         //User mint Amount
+//         uint256 tempDay = day;
+//         mintAmount(freeStakeUsers[i],mintedValue);
+//         createFreeStakeRecord(freeStakeUsers[i],mintedValue,tempDay);
+//         uint256 id = generateId();
+//         uint256 dayInYear = 365;
+//         uint256 startDay = tempDay;
+//         uint256 endDay = startDay.add(dayInYear);   
+//         uint256 endDayTimeStamp = findEndDayTimeStamp(endDay);
+//         uint256 roiPercent = findPercentSlot();
+//         totalStakedAmount = totalStakedAmount.add(stakeAmount);
+//         (bool _isStakeholder, ) = isStakeholder(msg.sender);
+//         if(! _isStakeholder) addStakeholder(msg.sender);
+//         stakeRecord memory myRecord = stakeRecord({id:id,stakeAmount:stakeAmount, stakeName:'', numOfDays:dayInYear,
+//          currentTime:block.timestamp,claimed:false,startDay:startDay,endDay:endDay,
+//         endDayTimeStamp:endDayTimeStamp,isFreeStake:true,poolROIPercentSlot:roiPercent});
+//         stakeHolders[userAddress].push(myRecord); 
+//         }
+//      }
+//     }
+
+//     function createFreeStakeRecord(address freeStakeHolder, uint256 mintedAmount,uint256 day) internal onlyOwner{
+
+//         uint256 balance = balanceAtFreeStake[freeStakeHolder];
+//         uint256 mintValue = mintedAmount;
+//         // uint day = findDay();
+//         freeStakePerDayInfo memory myRecord = freeStakePerDayInfo({walletAddress:freeStakeHolder,balanceAtMoment:balance, claimedAmount:mintValue,transactDay:day});
+//         freeStakeRecords[day].push(myRecord);
+//     }
+
+//     function getFreeStakeRecords(uint day) public view returns (freeStakePerDayInfo[] memory freeStakeRecord) {
+        
+//         return freeStakeRecords[day];
+//     }
+    
+//     function freeStakeOf(address _stakeholder) public view returns(uint256) {
+    
+//         return freeStakes[_stakeholder];
+//     }
+
+//     function removeFreeStakeholder(address _stakeholder) internal {
+//         (bool _isFreeStakeholder, uint256 s) = isFreeStakeholder(_stakeholder);
+//         if(_isFreeStakeholder){
+//             freeStakeholders[s] = freeStakeholders[freeStakeholders.length - 1];
+//             freeStakeholders.pop();
+//         }
+//     }
+    
+//     function extendStakeLength(uint256 totalDays, uint256 id) public { 
+//         stakeRecord[] memory myRecord = stakeHolders[msg.sender];
+//         for(uint i=0; i<myRecord.length; i++){
+//             if(myRecord[i].id == id){
+//                 if(myRecord[i].isFreeStake){
+//                     if(totalDays >= 365){
+//                         require(myRecord[i].startDay + totalDays > myRecord[i].numOfDays , 'condition should not be meet');
+//                         myRecord[i].numOfDays = myRecord[i].startDay + totalDays;
+//                         myRecord[i].endDay = (myRecord[i].startDay).add(totalDays);
+//                         myRecord[i].endDayTimeStamp = findEndDayTimeStamp(myRecord[i].endDay);
+//                     }
+//                 }
+//                 else{
+//                     if(totalDays >= 1){
+//                         require(myRecord[i].startDay + totalDays > myRecord[i].numOfDays , 'condition should not be meet');
+//                         myRecord[i].numOfDays = myRecord[i].startDay + totalDays;
+//                         myRecord[i].endDay = (myRecord[i].startDay).add(totalDays);
+//                         myRecord[i].endDayTimeStamp = findEndDayTimeStamp(myRecord[i].endDay);
+//                     }
+//                 }
+//            stakeHolders[msg.sender][i] = myRecord[i];
+//             }
+//         }
+//     }
+
+
+//     //Origin Address Functionality
+
+//     function getOriginAmount() public view returns (uint256){
+//         return originAmount;
+//     }
+
+//     function getBigPayDayAmount() public view returns (uint256){
+//         return bigPayDay;
+//     }
+
+//     function mintOriginAmount() public onlyOwner{
+//         require(block.timestamp > startDate + 31536000,'origin amount minted after 1 year');
+//         mintAmount(originAddress,originAmount);
+//     }
+
+
+
+//     //Adoption Amplifier
+
+//     //Claim AA Tokens
+//     function countShare (uint256 userSubmittedBNB, uint256 dayTotalBNB, uint256 availablePTP) internal  view returns  (uint256) {
+//         uint256 share = 0;
+//         share = userSubmittedBNB.div(dayTotalBNB);
+//         share = share.mul(availablePTP);
+//         return share * 10 ** 18;
+//     }
+
+//     function findReferalBonusForAA (address user, uint256 share) public view returns (uint256){
+
+//        uint256 totalAmount = share;
+//        uint256 sumUpAmount = 0;
+//        address referer = findUserReferal(user);
+//      if(referer != address(0)){
+//        if(referer != user){
+//         // if referer is not user it self
+//         uint256 referdBonus = totalAmount.mul(10);
+//         referdBonus = referdBonus.div(100);
+//         sumUpAmount = sumUpAmount.add(referdBonus);
+//        }
+//        else{
+//         // if a user referd it self  
+//         uint256 referdBonus = totalAmount.mul(20);
+//         referdBonus = referdBonus.div(100);
+//         sumUpAmount = sumUpAmount.add(referdBonus);
+//         totalAmount = totalAmount.add(referdBonus);
+//         uint256 totalBonus = totalAmount.mul(10);
+//         totalBonus = totalBonus.div(100);
+//         sumUpAmount = sumUpAmount.add(totalBonus);
+       
+//        }
+//      }
+//        return sumUpAmount;
+//     }
+
+
+//     function claimAATokens () public {
+//         uint256 presentDay = findDay();
+//         require(presentDay > 0,'Token Can be claimed after one day');
+//         uint256 prevDay = presentDay.sub(1);
+//         uint256 dayTotalBNB = getTotalBNB(prevDay);
+//         uint256 availablePTP = getAvailablePTP(prevDay);
+//         RecordInfo[] memory userRecords = getTransactionRecords(prevDay);
+//         for(uint i = 0; i<userRecords.length;i++){
+//              uint256 userSubmittedBNB = 0;
+//              uint256 userShare = 0;
+//              uint256 referalBonus = 0;
+//             if(userRecords[i].user == msg.sender && userRecords[i].claimed == false)
+//          {
+//              userSubmittedBNB = userRecords[i].amount;
+//              userShare = countShare(userSubmittedBNB,dayTotalBNB,availablePTP);
+//              address userReferer = findUserReferal(msg.sender);
+//              if(userReferer != msg.sender && userReferer !=address(0)){
+//              uint256 amount = userShare;
+//              uint256 referingBonus = amount.mul(20);
+//              referingBonus = referingBonus.div(100);
+//              originAmount = originAmount.add(referingBonus);
+//              mintAmount(userReferer,referingBonus);
+//              createReferalRecords(userReferer,msg.sender,referingBonus);
+
+//              }
+//              referalBonus =  findReferalBonusForAA(msg.sender,userShare);  
+//              userShare = userShare.add(referalBonus);
+//              originAmount = originAmount.add(referalBonus);
+//              mintAmount(msg.sender,userShare);
+//              settleSubmission(prevDay);
+//              if(userReferer != address(0)){
+//             createReferalRecords(userReferer,msg.sender,referalBonus);
+//             }
+             
+//          }    
+//         }
+//     }
+
+//     //Referal Functionality
+//     function addReferalAddress(address refererAddress, address referdAddress) public {
+//         referAddresses.push(referdAddress);
+//         referalAddress[referdAddress] = refererAddress;
+//     }
+
+//     function getRefererAddress(address sender) public view returns(address){
+//         return referalAddress[sender];
+//     }
+
+//     function foundUserReferals(address sender) public view returns(address[] memory a) {
+//      address[] memory userReferalAccounts = new address[](referAddresses.length);
+//         for(uint i = 0; i< referAddresses.length; i++){
+//             if(referalAddress[referAddresses[i]] == sender){
+//                 userReferalAccounts[i]=referAddresses[i];
+//             }
+//         }
+//         return userReferalAccounts;
+//     }
+
+//     function createReferalRecords(address refererAddress, address referdAddress,uint256 awardedPTP) public {
+//         uint day = findDay();
+//         referalsRecord memory myRecord = referalsRecord({referdAddress:referdAddress,day:day,awardedPTP:awardedPTP});
+//         referals[refererAddress].push(myRecord);
+//     }
+
+//     function getReferalRecords(address refererAddress) public view returns (referalsRecord[] memory referal) {
+        
+//         return referals[refererAddress];
+//     }
+
+//     function getAllAddresses() public view returns (address[] memory a) {
+
+//         address[] memory allAddressData = new address[](allAddresses.length);
+//         for (uint i=0; i < allAddresses.length; i++) {
+//             allAddressData[i] = allAddresses[i];
+//         }
+//         return allAddressData;
+//     }
+ 
+//     function addRecord (address _sender, uint256 _amount) internal {
+//         require(_amount > 0, 'Amount must be greater than 0');
+//         uint day = findDay();
+//         address refererAddress = getRefererAddress(_sender);
+//         RecordInfo memory myRecord = RecordInfo({amount: _amount, time: block.timestamp, claimed: false, user:_sender,refererAddress:refererAddress});
+//         records[day].push(myRecord);
+//         totalETH[day] = totalETH[day] + _amount;
+//         bool check = false;
+//         for (uint i=0; i < allAddresses.length; i++) {
+//             if( allAddresses[i] == _sender ) {
+//                 check = true;
+//             }
+//         }
+//         if(!check) {
+//             allAddresses.push(_sender);
+//         }
+//     }
+
+//     function getTransactionRecords(uint day) public view returns (RecordInfo[] memory record) {
+        
+//         return records[day];
+//     }
+
+//     function settleSubmission (uint day) public  {
+//         RecordInfo[] memory myRecord = records[day];
+//         for(uint i = 0; i<myRecord.length; i++){
+//             if(myRecord[i].user == msg.sender){
+//                  myRecord[i].claimed = true;
+//                  records[day][i] = myRecord[i];
+//             }
+//         }
+//     }
+
+//     function clearSubmission (address _sender ) public onlyOwner {
+//         for (uint i = 0; i < allAddresses.length ; i++){
+//             if( allAddresses[i] == _sender ) {
+//                 allAddresses[i] = allAddresses[allAddresses.length - 1];
+//                 delete allAddresses[allAddresses.length - 1];
+//             }
+//         }
+//     }
+
+//     function getTotalBNB (uint day) public view returns (uint256){
+//        return totalETH[day];
+//     }
+
+//     function setAvailabePTP (uint256 day) public onlyOwner {
+//      require(block.timestamp < startDate + 31536000,'Adoption Amplifier runs for 1 year only');
+//         uint256 hexAvailabel = 0;
+//         // uint day = findDay();
+//         uint256 firstDayAvailabilty = 1000000000; 
+//         uint256 otherDayAvailabilty = 500000000;
+//         if(day == 0){
+//             hexAvailabel = firstDayAvailabilty;
+//         }
+//         else{
+//             hexAvailabel = otherDayAvailabilty;
+//         }
+ 
+//         bool _findDay = checkDay[day]; 
+//         require(!_findDay,'Available hex can not set twice');
+//         totalHexAvailable[day] = totalHexAvailable[day].add(hexAvailabel);
+//         checkDay[day] = true;
+//     }
+
+//     function getAvailablePTP (uint day) public view returns (uint256){
+//        return totalHexAvailable[day];
+//     }
+
+//     receive() external payable {
+//         addRecord(msg.sender, msg.value);
+//     }
+
+//     function totalBalance() external view returns(uint) {
+//      //return address(owner).balance;
+//      return payable(address(this)).balance;
+//     }
+
+//     function withdraw() public onlyOwner {
+//      payable(msg.sender).transfer(this.totalBalance());
+//     }
+
+//     //Big Pay Day
+    
+//     function settleSub (address userAddress, uint prevDay) public  {
+//         RecordInfo[] memory myRecord = records[prevDay];
+//         for(uint i = 0; i<myRecord.length; i++){
+//             if(myRecord[i].user == userAddress){
+//                  myRecord[i].claimed = true;
+//                  records[prevDay][i] = myRecord[i];
+//             }
+//         }
+//     }
+
+//     function unclaimedRecord() public onlyOwner {
+//         uint256 presentDay = findDay();
+//         require(presentDay > 1 , 'you have to wait to proceed because day less than 0');
+//         uint256 prevDay = presentDay.sub(2);
+//         uint256 dayTotalBNB = getTotalBNB(prevDay);
+//         uint256 availablePTP = getAvailablePTP(prevDay);
+//         RecordInfo[] memory userRecords = getTransactionRecords(prevDay);
+//         if(userRecords.length > 0){
+//         for(uint i = 0; i < userRecords.length; i++){
+//             uint256 userSubmittedBNB = 0;
+//             uint256 userShare = 0;
+//             if(userRecords[i].claimed == false){
+//                 userSubmittedBNB = userRecords[i].amount;
+//                 userShare = countShare(userSubmittedBNB,dayTotalBNB,availablePTP);
+//                 bigPayDay = bigPayDay.add(userShare);
+//                 settleSub(userRecords[i].user, prevDay);
+//             }
+           
+//         } 
+//         }
+//         else{
+//         bigPayDay = bigPayDay.add(availablePTP);
+//     }
+//     }
+
+//     function countBigPayDayShare (uint256 userSubmittedBNB, uint256 dayTotalBNB) internal  view returns  (uint256) {
+//         uint256 share = 0;
+//         share = userSubmittedBNB.div(dayTotalBNB);
+//         share = share.mul(bigPayDay);
+//         return share * 10 ** 18;
+//     }
+
+//     function bigPayDayDistribute() public onlyOwner{
+//     //   require(block.timestamp < startDate + 31708800,'Free stakes available just 1 year');
+//       RecordInfo[] memory userRecords = getTransactionRecords(365);
+//         for(uint i = 0; i < userRecords.length; i++){
+//             uint256 userSubmittedBNB = userRecords[i].amount;
+//             uint256 dayTotalBNB = getTotalBNB(365);
+//             uint256 userShare = countBigPayDayShare(userSubmittedBNB,dayTotalBNB);
+//             mintAmount(userRecords[i].user, userShare);
+//         }
+
+//     }
+
+// }
